@@ -92,7 +92,7 @@ Set-Variable BCU_EXE_SOURCE "$PSScriptRoot\BCU-4.0.21.1\BiosConfigUtility64.exe"
   #Set-Variable BCU_EXE "$PSScriptRoot\4.0.15.1\EchoArgs.exe" -option ReadOnly -Force
 
 #Configute which ISA00075 version to use
-Set-Variable ISA75DT_EXE_SOURCE "$PSScriptRoot\ISA75DT-1.0.1.39\Windows\Intel-SA-00075-console.exe" -option ReadOnly -Force
+Set-Variable ISA75DT_EXE_SOURCE "$PSScriptRoot\ISA75DT-1.0.3.215\Windows\Intel-SA-00075-console.exe" -option ReadOnly -Force
 
 
 #For performance issues (AV software that keeps scanning EXEs from network) we copy BCU locally
@@ -111,9 +111,6 @@ Set-Variable MODELS_PATH "$PSScriptRoot\Models" -option ReadOnly -Force
 
 #Common exit code
 Set-Variable ERROR_SUCCESS_REBOOT_REQUIRED 3010 -option ReadOnly -Force
-
-
-
 
 function Test-Environment()
 {
@@ -1361,11 +1358,23 @@ function Invoke-BitLockerDecryption()
             {
                 if ( $drivestatus.DriveLetter.ToUpper() -eq $systemdrive)
                 {
-                    # .ProtectionStatus will also be 0 if BitLocker was just suspended, so we can not use this property
-                    if ( $drivestatus.EncryptionMethod -ne 0 )
+                    # .EncryptionMethod is not present when bitlocker is not in use, so we need to handle this other wise it errors. 
+                    if(Get-Member -inputobject $drivestatus -name "EncryptionMethod" -Membertype Properties)
                     {
-                        $bitLockerActive=$true
-                        write-verbose "BitLocker is active for system drive ($systemdrive)!"
+
+                        # .ProtectionStatus will also be 0 if BitLocker was just suspended, so we can not use this property
+                            if ( $drivestatus.EncryptionMethod -ne 0 )
+                            {
+                                $bitLockerActive=$true
+                                write-verbose "BitLocker is active for system drive ($systemdrive)!"
+                            }
+                    } 
+                    else 
+                    {
+                
+                    write-verbose "BitLocker is not in use for system drive ($systemdrive)!"
+                    $bitLockerActive=$False
+                
                     }
                 }
             }
@@ -2229,7 +2238,8 @@ function Update-MEFirmware()
   
     #We use the XML output method, so the tool will generate a file called [DEVICENAME]_System_Summary.xml.
     #We need to make sure that no other *_System_Summary.xml file exists
-    $xmlFilePattern="*_System_Summary.xml"
+    $CompName=$env:computername
+    $xmlFilePattern="$CompName.xml"
  
     $ignored=Remove-Item -Path "$tempFolder\$xmlFilePattern" -Force -ErrorAction SilentlyContinue
     
@@ -2280,7 +2290,7 @@ function Update-MEFirmware()
                     $MEData.VersionParsed=$true
                 }
                 
-                $MEData.FeatureLevel=$xml.System.ME_Firmware_Information.ME_SKU
+                #$MEData.FeatureLevel=$xml.System.ME_Firmware_Information.ME_SKU
                 $MEData.Provisioned=$xml.System.ME_Firmware_Information.ME_Provisioning_State
 
                 $MEData.VulnerableText=$xml.System.System_Status.System_Risk
@@ -2316,7 +2326,7 @@ function Update-MEFirmware()
                 write-host "Management Engine information:"
                 write-host " "
                 write-host "  Firmware Version ..: $($MEData.VersionText)"
-                write-host "  Feature Level .....: $($MEData.FeatureLevel)"
+                #write-host "  Feature Level .....: $($MEData.FeatureLevel)"
                 write-host "  Provisioned .......: $($MEData.Provisioned)"
                 write-host " "
 
